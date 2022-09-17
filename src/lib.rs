@@ -9,7 +9,7 @@ use futures::FutureExt;
 use tokio::runtime;
 
 #[no_mangle]
-pub extern "C" fn prim__null_ptr() -> AnyPtr {
+pub const extern "C" fn prim__null_ptr() -> AnyPtr {
     ptr::null()
 }
 
