@@ -4,7 +4,12 @@ sourcedir = "src"
 
 modules =
     Async.Readme
-  , Async.Generated
-  , Async.Internal
 
-main = Async.Readme
+  , Async.Generated
+
+  , Async.Cast
+  , Async.FFIs
+  , Async.Future
+
+main       = Async.Readme
+executable = main

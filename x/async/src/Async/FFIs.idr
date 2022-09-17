@@ -1,4 +1,4 @@
-module Async.Internal
+module Async.FFIs
 
 import Async.Generated
 
