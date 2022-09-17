@@ -21,10 +21,6 @@ export
 prim__block_on : AnyFuturePtr -> PrimIO AnyOutputPtr
 
 export
-%foreign rtLib "prim__async_println"
-prim__async_println : String -> PrimIO AnyFuturePtr
-
-export
 %foreign rtLib "prim__delay"
 prim__delay : (Ptr () -> PrimIO AnyOutputPtr) -> AnyFuturePtr
 

@@ -1,6 +1,5 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::ffi::CStr;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr;
@@ -53,20 +52,6 @@ pub unsafe extern "C" fn prim__block_on(xs: *mut AnyFuture) -> AnyPtr {
 #[no_mangle]
 pub unsafe extern "C" fn prim__delay(f: extern "C" fn() -> AnyPtr) -> *mut AnyFuture {
     to_any_future(async move { f() })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn prim__async_print(x: *const libc::c_char) -> *mut AnyFuture {
-    let x = CStr::from_ptr(x).to_str().unwrap();
-    print!("{x}");
-    to_any_future(async move { ptr::null() })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn prim__async_println(x: *const libc::c_char) -> *mut AnyFuture {
-    let x = CStr::from_ptr(x).to_str().unwrap();
-    println!("{x}");
-    to_any_future(async move { ptr::null() })
 }
 
 #[no_mangle]
