@@ -21,5 +21,6 @@ ilib:
 		echo ''                                                                >> ${GEN_PATH} && \
 		echo 'public export'                                                   >> ${GEN_PATH} && \
 		echo 'rtLib : String -> String'                                        >> ${GEN_PATH} && \
-		echo "rtLib f = \"C:\" ++ f ++ \", ${LIB_PREFIX}/libasyncr.so\"" >> ${GEN_PATH})
+		echo "rtLib f = \"C:\" ++ f ++ \", ${LIB_PREFIX}/libasyncrt.so\"" >> ${GEN_PATH})
+	(cp target/release/libasyncrt.so ${LIB_PREFIX})
 	(cd x/async && idris2 --build async.ipkg)

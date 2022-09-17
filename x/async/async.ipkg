@@ -3,5 +3,8 @@ package async
 sourcedir = "src"
 
 modules =
-    Async.Generated
+    Async.Readme
+  , Async.Generated
   , Async.Internal
+
+main = Async.Readme
