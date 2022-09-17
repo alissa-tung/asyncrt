@@ -8,6 +8,11 @@ use std::ptr;
 use futures::FutureExt;
 use tokio::runtime;
 
+#[no_mangle]
+pub extern "C" fn prim__null_ptr() -> AnyPtr {
+    ptr::null()
+}
+
 type AnyPtr = *const libc::c_void;
 
 type Awaitable = Pin<Box<dyn Future<Output = AnyPtr>>>;
@@ -66,8 +71,8 @@ pub unsafe extern "C" fn prim__async_println(x: *const libc::c_char) -> *mut Any
 
 #[no_mangle]
 pub unsafe extern "C" fn prim__any_future__map(
-    xs: *mut AnyFuture,
     f: extern "C" fn(AnyPtr) -> AnyPtr,
+    xs: *mut AnyFuture,
 ) -> *mut AnyFuture {
     let xs = Box::from_raw(xs);
     to_any_future(async move {
@@ -138,15 +143,27 @@ mod tests {
         let x: *const usize = &x;
         let x = x as AnyPtr;
         let xs = prim__any_future__pure(x);
-        let xs = unsafe { prim__any_future__map(xs, incr_usize) };
-        let xs = unsafe { prim__any_future__map(xs, incr_usize) };
-        let xs = unsafe { prim__any_future__map(xs, incr_usize) };
+        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
+        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
+        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
         let xs = unsafe { prim__any_future__bind(xs, id_println_usize) };
-        let xs = unsafe { prim__any_future__map(xs, incr_usize) };
+        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
         let xs = unsafe { prim__any_future__bind(xs, id_println_usize) };
         let xs = unsafe { prim__any_future__bind(xs, async_println_usize) };
         let x = unsafe { prim__block_on(xs) } as *const ();
         let x = unsafe { *x };
         println!("{x:?}")
     }
+}
+
+#[no_mangle]
+pub extern "C" fn prim__any_ptr__from_u32(x: u32) -> AnyPtr {
+    let x = Box::new(x);
+    Box::into_raw(x) as AnyPtr
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__any_ptr__to_u32(x: AnyPtr) -> u32 {
+    let x = Box::from_raw(x as *mut u32);
+    *x
 }
