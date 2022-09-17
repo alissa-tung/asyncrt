@@ -22,4 +22,13 @@ main = do
   x <- primIO $ prim__block_on xs
   x <- primIO $ prim__any_ptr__to_u32 x
   printLn x
+  x <- primIO $ prim__any_ptr__from_u32 42
+  let xs = prim__any_future__pure x
+  let xs = prim__any_future__bind xs $ \x => unsafePerformIO $ do
+             x <- primIO $ prim__any_ptr__to_u32 x
+             x <- primIO $ prim__any_ptr__from_u32 (x + 1)
+             pure $ prim__any_future__pure x
+  x <- primIO $ prim__block_on xs
+  x <- primIO $ prim__any_ptr__to_u32 x
+  printLn x
   pure ()
