@@ -1,4 +1,5 @@
 #![allow(clippy::missing_safety_doc)]
+#![feature(strict_provenance)]
 
 use std::future::Future;
 use std::pin::Pin;
@@ -8,20 +9,20 @@ use futures::FutureExt;
 use tokio::runtime;
 
 #[no_mangle]
-pub const extern "C" fn prim__null_ptr() -> AnyPtr {
-    ptr::null()
+pub extern "C" fn prim__null_ptr() -> AnyPtr {
+    ptr::null::<*const libc::c_void>().expose_addr()
 }
 
-type AnyPtr = *const libc::c_void;
+type AnyPtr = usize;
 
-type Awaitable = Pin<Box<dyn Future<Output = AnyPtr>>>;
+type Awaitable = Pin<Box<dyn Future<Output = AnyPtr> + Send>>;
 
 #[repr(C)]
 pub struct AnyFuture(Awaitable);
 
 fn to_any_future<F>(xs: F) -> *mut AnyFuture
 where
-    F: Future<Output = AnyPtr> + 'static,
+    F: Future<Output = AnyPtr> + Send + 'static,
 {
     let xs = Box::pin(xs) as Awaitable;
     let xs = Box::new(AnyFuture(xs));
@@ -50,7 +51,14 @@ pub unsafe extern "C" fn prim__block_on(xs: *mut AnyFuture) -> AnyPtr {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn prim__delay(f: extern "C" fn() -> AnyPtr) -> *mut AnyFuture {
+pub unsafe extern "C" fn prim__spawn(xs: *mut AnyFuture) -> *mut AnyFuture {
+    let xs = *Box::from_raw(xs);
+    tokio::spawn(xs);
+    todo!()
+}
+
+#[no_mangle]
+pub extern "C" fn prim__delay(f: extern "C" fn() -> AnyPtr) -> *mut AnyFuture {
     to_any_future(async move { f() })
 }
 
@@ -79,19 +87,16 @@ pub unsafe extern "C" fn prim__any_future__bind(
     let xs = Box::from_raw(xs);
     to_any_future(async move {
         let x = xs.await;
-        let ys = k(x);
-        let ys = Box::from_raw(ys);
+        let ys = Box::from_raw(k(x));
         ys.await
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ptr;
-
     use crate::{
         prim__any_future__bind, prim__any_future__map, prim__any_future__pure, prim__block_on,
-        to_any_future, AnyFuture, AnyPtr,
+        prim__null_ptr, to_any_future, AnyFuture, AnyPtr,
     };
 
     extern "C" fn incr_usize(x: AnyPtr) -> AnyPtr {
@@ -106,7 +111,8 @@ mod tests {
         let x = unsafe { *x };
         to_any_future(async move {
             println!("{x}");
-            Box::into_raw(Box::new(x)) as *const libc::c_void
+            let x = Box::into_raw(Box::new(x)) as *const libc::c_void;
+            x.expose_addr()
         })
     }
 
@@ -118,7 +124,7 @@ mod tests {
         to_any_future(async move {
             ys.await;
             xs.await;
-            ptr::null()
+            prim__null_ptr()
         })
     }
 
