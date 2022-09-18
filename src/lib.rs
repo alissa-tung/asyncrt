@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::ptr;
 
 use futures::FutureExt;
-use tokio::runtime;
+use tokio::runtime::{self, Runtime};
 use tokio::task::JoinError;
 
 #[no_mangle]
@@ -43,19 +43,43 @@ impl Future for AnyFuture {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn prim__block_on(xs: *mut AnyFuture) -> AnyPtr {
-    let xs = Box::from_raw(xs);
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(xs)
+pub extern "C" fn prim__new_runtime() -> *const libc::c_void {
+    let rt = Box::new(
+        runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    );
+    Box::into_raw(rt) as _
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn prim__spawn(xs: *mut AnyFuture) -> *mut AnyFuture {
+pub unsafe extern "C" fn prim__runtime__get_handle(rt: *const libc::c_void) -> *const libc::c_void {
+    let rt = rt as *mut Runtime;
+    let handle = Box::new(rt.as_ref().unwrap().handle().clone());
+    Box::into_raw(handle) as _
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__block_on(
+    rt_handle: *const libc::c_void,
+    xs: *mut AnyFuture,
+) -> AnyPtr {
+    let rt_handle = rt_handle as *const runtime::Handle;
+    let rt_handle = rt_handle.as_ref().unwrap();
+    let xs = Box::from_raw(xs);
+    rt_handle.block_on(xs)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__spawn(
+    rt_handle: *const libc::c_void,
+    xs: *mut AnyFuture,
+) -> *mut AnyFuture {
+    let rt_handle = rt_handle as *const runtime::Handle;
+    let rt_handle = rt_handle.as_ref().unwrap();
     let xs = *Box::from_raw(xs);
-    let xs = tokio::spawn(xs);
+    let xs = rt_handle.spawn(xs);
     to_any_future(async move {
         let xs = to_join_result(xs.await);
         xs.expose_addr()
@@ -144,9 +168,12 @@ pub unsafe extern "C" fn prim__any_future__bind(
 
 #[cfg(test)]
 mod tests {
+    use std::ptr;
+
     use crate::{
-        prim__any_future__bind, prim__any_future__map, prim__any_future__pure, prim__block_on,
-        prim__null_ptr, to_any_future, AnyFuture, AnyPtr,
+        addr_to_join_result, prim__any_future__bind, prim__any_future__map, prim__any_future__pure,
+        prim__any_ptr__from_u32, prim__block_on, prim__new_runtime, prim__null_ptr,
+        prim__runtime__get_handle, prim__spawn, to_any_future, AnyFuture, AnyPtr, JoinResult,
     };
 
     extern "C" fn incr_usize(x: AnyPtr) -> AnyPtr {
@@ -180,20 +207,25 @@ mod tests {
 
     #[test]
     fn test_main() {
-        let x = 42;
-        let x: *const usize = &x;
-        let x = x as AnyPtr;
-        let xs = prim__any_future__pure(x);
-        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
-        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
-        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
-        let xs = unsafe { prim__any_future__bind(xs, id_println_usize) };
-        let xs = unsafe { prim__any_future__map(incr_usize, xs) };
-        let xs = unsafe { prim__any_future__bind(xs, id_println_usize) };
-        let xs = unsafe { prim__any_future__bind(xs, async_println_usize) };
-        let x = unsafe { prim__block_on(xs) } as *const ();
-        let x = unsafe { *x };
-        println!("{x:?}")
+        unsafe {
+            let rt = prim__new_runtime();
+            let rt_handle = prim__runtime__get_handle(rt);
+            drop(rt);
+            let x = 42;
+            let x: *const usize = &x;
+            let x = x as AnyPtr;
+            let xs = prim__any_future__pure(x);
+            let xs = prim__any_future__map(incr_usize, xs);
+            let xs = prim__any_future__map(incr_usize, xs);
+            let xs = prim__any_future__map(incr_usize, xs);
+            let xs = prim__any_future__bind(xs, id_println_usize);
+            let xs = prim__any_future__map(incr_usize, xs);
+            let xs = prim__any_future__bind(xs, id_println_usize);
+            let xs = prim__any_future__bind(xs, async_println_usize);
+            let x = prim__block_on(rt_handle, xs) as *const ();
+            let x = *x;
+            println!("{x:?}")
+        }
     }
 
     #[test]
@@ -201,6 +233,27 @@ mod tests {
         for _ in 0..10 {
             println!("{}", prim__null_ptr())
         }
+    }
+
+    #[test]
+    fn test_spawn() {
+        unsafe {
+            let rt = prim__new_runtime();
+            let rt_handle = prim__runtime__get_handle(rt);
+            drop(rt);
+            let xs = prim__spawn(
+                rt_handle,
+                prim__any_future__pure(prim__any_ptr__from_u32(42)),
+            );
+            let xs = prim__block_on(rt_handle, xs);
+            let xs = addr_to_join_result(xs);
+            let xs = Box::from_raw(xs as *mut JoinResult);
+            assert!(xs.ok);
+            assert!(xs.error.is_null());
+            let addr = ptr::from_exposed_addr(xs.addr) as *const u32;
+            assert!(!addr.is_null());
+            assert_eq!(*addr, 42);
+        };
     }
 }
 

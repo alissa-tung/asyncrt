@@ -13,12 +13,28 @@ AnyOutputPtr : Type
 AnyOutputPtr = AnyPtr
 
 export
+RtPtr : Type
+RtPtr = AnyPtr
+
+export
+RtHPtr : Type
+RtHPtr = AnyPtr
+
+export
 %foreign rtLib "prim__null_ptr"
 prim__null_ptr : AnyOutputPtr
 
 export
+%foreign rtLib "prim__new_runtime"
+prim__new_runtime : PrimIO RtPtr
+
+export
+%foreign rtLib "prim__runtime__get_handle"
+prim__runtime__get_handle : RtPtr -> PrimIO RtHPtr
+
+export
 %foreign rtLib "prim__block_on"
-prim__block_on : AnyFuturePtr -> PrimIO AnyOutputPtr
+prim__block_on : RtHPtr -> AnyFuturePtr -> PrimIO AnyOutputPtr
 
 export
 %foreign rtLib "prim__delay"

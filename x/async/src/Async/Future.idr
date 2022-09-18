@@ -2,6 +2,7 @@ module Async.Future
 
 import public Async.Cast
 import        Async.FFIs
+import        Async.Runtime
 
 %default total
 
@@ -60,7 +61,7 @@ delayIO xs = MkFuture $ prim__delay $ \_ =>
   in toPrim xs
 
 export
-blockOn : (HasIO io, CastOutputPtr a) => Future a -> io a
-blockOn (MkFuture xs) = do
-  x <- primIO $ prim__block_on xs
+blockOn : (HasIO io, CastOutputPtr a) => Runtime -> Future a -> io a
+blockOn (MkRuntime rt) (MkFuture xs) = do
+  x <- primIO $ prim__block_on rt xs
   pure . from_output_ptr $ MkOutputPtrFor x
