@@ -1,12 +1,14 @@
 #![allow(clippy::missing_safety_doc)]
 #![feature(strict_provenance)]
 
+use std::ffi::CString;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr;
 
 use futures::FutureExt;
 use tokio::runtime;
+use tokio::task::JoinError;
 
 #[no_mangle]
 pub extern "C" fn prim__null_ptr() -> AnyPtr {
@@ -53,8 +55,56 @@ pub unsafe extern "C" fn prim__block_on(xs: *mut AnyFuture) -> AnyPtr {
 #[no_mangle]
 pub unsafe extern "C" fn prim__spawn(xs: *mut AnyFuture) -> *mut AnyFuture {
     let xs = *Box::from_raw(xs);
-    tokio::spawn(xs);
-    todo!()
+    let xs = tokio::spawn(xs);
+    to_any_future(async move {
+        let xs = to_join_result(xs.await);
+        xs.expose_addr()
+    })
+}
+
+#[repr(C)]
+pub enum JoinErrorReason {
+    Cancelled = 0,
+    Panic = 1,
+}
+
+#[repr(C)]
+pub struct JoinResult {
+    ok: bool,
+    addr: usize,
+    kind: JoinErrorReason,
+    error: *const libc::c_char,
+}
+
+fn to_join_result(x: Result<usize, JoinError>) -> *mut JoinResult {
+    let x = match x {
+        Ok(addr) => JoinResult {
+            ok: true,
+            addr,
+            kind: JoinErrorReason::Cancelled,
+            error: ptr::null(),
+        },
+        Err(err) => JoinResult {
+            ok: false,
+            addr: 0,
+            kind: if err.is_panic() {
+                JoinErrorReason::Panic
+            } else {
+                JoinErrorReason::Cancelled
+            },
+            error: {
+                CString::new(err.to_string())
+                    .map(|x| x.into_raw() as *const libc::c_char)
+                    .unwrap_or_else(|_| ptr::null())
+            },
+        },
+    };
+    Box::into_raw(Box::new(x))
+}
+
+#[no_mangle]
+pub extern "C" fn addr_to_join_result(x: usize) -> *const JoinResult {
+    ptr::from_exposed_addr(x)
 }
 
 #[no_mangle]
@@ -145,6 +195,13 @@ mod tests {
         let x = unsafe { *x };
         println!("{x:?}")
     }
+
+    #[test]
+    fn test_null_ptr() {
+        for _ in 0..10 {
+            println!("{}", prim__null_ptr())
+        }
+    }
 }
 
 #[no_mangle]
@@ -155,6 +212,6 @@ pub extern "C" fn prim__any_ptr__from_u32(x: u32) -> AnyPtr {
 
 #[no_mangle]
 pub unsafe extern "C" fn prim__any_ptr__to_u32(x: AnyPtr) -> u32 {
-    let x = Box::from_raw(x as *mut u32);
+    let x = Box::from_raw(ptr::from_exposed_addr_mut(x));
     *x
 }

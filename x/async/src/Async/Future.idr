@@ -54,9 +54,9 @@ namespace Async
 
 
 export
-delayIO : CastOutputPtr a => (() -> IO a) -> Future a
+delayIO : CastOutputPtr a => Lazy (IO a) -> Future a
 delayIO xs = MkFuture $ prim__delay $ \_ =>
-  let xs = anyOutputPtr . to_output_ptr <$> xs ()
+  let xs = anyOutputPtr . to_output_ptr <$> xs
   in toPrim xs
 
 export
