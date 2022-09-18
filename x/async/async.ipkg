@@ -11,6 +11,7 @@ modules =
   , Async.FFIs
   , Async.Future
   , Async.Runtime
+  , Async.Types
 
 main       = Async.Readme
 executable = main

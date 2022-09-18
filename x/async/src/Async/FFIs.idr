@@ -37,6 +37,10 @@ export
 prim__block_on : RtHPtr -> AnyFuturePtr -> PrimIO AnyOutputPtr
 
 export
+%foreign rtLib "prim__spawn"
+prim__spawn : RtHPtr -> AnyFuturePtr -> PrimIO AnyFuturePtr
+
+export
 %foreign rtLib "prim__delay"
 prim__delay : (Ptr () -> PrimIO AnyOutputPtr) -> AnyFuturePtr
 
@@ -53,6 +57,21 @@ export
 prim__any_future__bind : AnyFuturePtr -> (AnyOutputPtr -> AnyFuturePtr) -> AnyFuturePtr
 
 
+export
+%foreign rtLib "prim__join_result__get_ok"
+prim__join_result__get_ok : AnyOutputPtr -> Int
+
+export
+%foreign rtLib "prim__join_result__get_addr"
+prim__join_result__get_addr : AnyOutputPtr -> AnyOutputPtr
+
+export
+%foreign rtLib "prim__join_result__get_kind"
+prim__join_result__get_kind : AnyOutputPtr -> Int
+
+export
+%foreign rtLib "prim__join_result__get_error"
+prim__join_result__get_error : AnyOutputPtr -> String
 
 export
 %foreign rtLib "prim__any_ptr__from_u32"

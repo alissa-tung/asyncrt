@@ -80,10 +80,7 @@ pub unsafe extern "C" fn prim__spawn(
     let rt_handle = rt_handle.as_ref().unwrap();
     let xs = *Box::from_raw(xs);
     let xs = rt_handle.spawn(xs);
-    to_any_future(async move {
-        let xs = to_join_result(xs.await);
-        xs.expose_addr()
-    })
+    to_any_future(async move { to_join_result(xs.await).expose_addr() })
 }
 
 #[repr(C)]
@@ -127,8 +124,27 @@ fn to_join_result(x: Result<usize, JoinError>) -> *mut JoinResult {
 }
 
 #[no_mangle]
-pub extern "C" fn addr_to_join_result(x: usize) -> *const JoinResult {
-    ptr::from_exposed_addr(x)
+pub unsafe extern "C" fn prim__join_result__get_ok(x: usize) -> libc::c_int {
+    let x: *const JoinResult = ptr::from_exposed_addr(x);
+    x.as_ref().unwrap().ok as _
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__join_result__get_addr(x: usize) -> usize {
+    let x: *const JoinResult = ptr::from_exposed_addr(x);
+    x.as_ref().unwrap().addr
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__join_result__get_kind(x: usize) -> libc::c_int {
+    let x: *const JoinResult = ptr::from_exposed_addr(x);
+    x.as_ref().unwrap().kind as libc::c_int
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__join_result__get_error(x: usize) -> *const libc::c_char {
+    let x: *const JoinResult = ptr::from_exposed_addr(x);
+    x.as_ref().unwrap().error
 }
 
 #[no_mangle]
@@ -170,8 +186,10 @@ pub unsafe extern "C" fn prim__any_future__bind(
 mod tests {
     use std::ptr;
 
+    use tokio::runtime;
+
     use crate::{
-        addr_to_join_result, prim__any_future__bind, prim__any_future__map, prim__any_future__pure,
+        prim__any_future__bind, prim__any_future__map, prim__any_future__pure,
         prim__any_ptr__from_u32, prim__block_on, prim__new_runtime, prim__null_ptr,
         prim__runtime__get_handle, prim__spawn, to_any_future, AnyFuture, AnyPtr, JoinResult,
     };
@@ -254,6 +272,61 @@ mod tests {
             assert!(!addr.is_null());
             assert_eq!(*addr, 42);
         };
+    }
+
+    #[test]
+    fn test_tokio() {
+        let rt = runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let handle = rt.handle().clone();
+        handle.block_on(async move { println!("__0__") });
+        handle.block_on(async move { println!("__1__") });
+        let xs = handle.spawn(async move { println!("__2__") });
+        let ys = handle.spawn(async move { println!("__3__") });
+        handle.block_on(async move { println!("__4__") });
+        handle.block_on(async move { ys.await.unwrap() });
+        handle.block_on(async move { xs.await.unwrap() });
+    }
+
+    fn addr_to_join_result(x: usize) -> *const JoinResult {
+        ptr::from_exposed_addr(x)
+    }
+
+    #[test]
+    fn test_tokio_ffi() {
+        unsafe {
+            let rt = prim__new_runtime();
+            let rt = prim__runtime__get_handle(rt);
+            _ = prim__block_on(
+                rt,
+                to_any_future(async move {
+                    println!("__0__");
+                    0
+                }),
+            );
+            _ = prim__block_on(
+                rt,
+                to_any_future(async move {
+                    println!("__1__");
+                    0
+                }),
+            );
+            let xs = prim__spawn(
+                rt,
+                to_any_future(async move {
+                    println!("__2__");
+                    0
+                }),
+            );
+            let xs = prim__block_on(rt, xs);
+            let xs: *const JoinResult = ptr::from_exposed_addr(xs);
+            let xs = Box::from_raw(xs as *mut JoinResult);
+            assert!(xs.ok);
+            assert_eq!(xs.addr, 0);
+            assert!(xs.error.is_null());
+        }
     }
 }
 

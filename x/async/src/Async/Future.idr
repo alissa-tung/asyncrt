@@ -3,6 +3,7 @@ module Async.Future
 import public Async.Cast
 import        Async.FFIs
 import        Async.Runtime
+import public Async.Types
 
 %default total
 
@@ -65,3 +66,12 @@ blockOn : (HasIO io, CastOutputPtr a) => Runtime -> Future a -> io a
 blockOn (MkRuntime rt) (MkFuture xs) = do
   x <- primIO $ prim__block_on rt xs
   pure . from_output_ptr $ MkOutputPtrFor x
+
+export
+spawn : CastOutputPtr a => Runtime -> Future a -> Future (Either JoinError a)
+spawn (MkRuntime rt) (MkFuture xs) = MkFuture . unsafePerformIO $ do
+  x <- primIO $ prim__spawn rt xs
+  let y : Bits64
+      y = believe_me x
+  printLn y
+  pure x

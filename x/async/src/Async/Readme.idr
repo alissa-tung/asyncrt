@@ -17,5 +17,10 @@ main = do
     let x := pure 42
     let x := the (Future Bits32) $ (+ 1) <$> x
     x <- x
+    let ys := spawn rt $ delayIO $ putStrLn "___spawn___"
+    ys <- ys
+    -- let () = case the (Either JoinError ()) ys of
+    --            Right ok => ok
+    --            Left err => unsafePerformIO $ printLn err
     delayIO $ printLn x
   printLn x

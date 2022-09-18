@@ -9,7 +9,7 @@ LIB_PREFIX ?= ${HOME}/.idris2/lib
 all: rlib ilib
 
 rlib:
-	(cargo fmt && cargo clippy -- -D warnings && cargo build --release)
+	(cargo fmt && cargo clippy -- -D warnings && cargo build)
 	(cbindgen --lang c -o ${OUT_H})
 	(sed -i 's/typedef struct Awaitable Awaitable;/typedef struct Awaitable {} Awaitable;/g' ${OUT_H})
 	(clang-format -i ${OUT_H})
@@ -22,7 +22,7 @@ ilib:
 		echo 'public export'                                                   >> ${GEN_PATH} && \
 		echo 'rtLib : String -> String'                                        >> ${GEN_PATH} && \
 		echo "rtLib f = \"C:\" ++ f ++ \", ${LIB_PREFIX}/libasyncrt.so\"" >> ${GEN_PATH})
-	(cp target/release/libasyncrt.so ${LIB_PREFIX})
+	(cp target/debug/libasyncrt.so ${LIB_PREFIX})
 	(cd x/async && idris2 --build async.ipkg)
 
 run:
