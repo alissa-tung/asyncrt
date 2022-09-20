@@ -22,7 +22,7 @@ RtHPtr = AnyPtr
 
 export
 %foreign rtLib "prim__null_ptr"
-prim__null_ptr : AnyOutputPtr
+prim__null_ptr : PrimIO AnyOutputPtr
 
 export
 %foreign rtLib "prim__new_runtime"

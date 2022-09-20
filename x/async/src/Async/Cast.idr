@@ -18,7 +18,7 @@ interface CastOutputPtr a where
 
 export
 CastOutputPtr () where
-  to_output_ptr () = MkOutputPtrFor prim__null_ptr
+  to_output_ptr () = MkOutputPtrFor $ unsafePerformIO $ primIO prim__null_ptr
   from_output_ptr _ = ()
 
 export
@@ -26,6 +26,7 @@ CastOutputPtr Bits32 where
   to_output_ptr = MkOutputPtrFor . prim__any_ptr__from_u32
   from_output_ptr (MkOutputPtrFor x) = prim__any_ptr__to_u32 x
 
+export
 castJoinResultPtr : CastOutputPtr a => AnyOutputPtr -> Either JoinError a
 castJoinResultPtr joinResultPtr = case prim__join_result__get_ok joinResultPtr of
   0 => Left $ case prim__join_result__get_kind joinResultPtr of
