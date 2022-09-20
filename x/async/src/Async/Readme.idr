@@ -1,26 +1,15 @@
 module Async.Readme
 
-import Async.Future
-import Async.Runtime
+import Async.FFIs
 
 %default total
 
 export
 main : IO ()
 main = do
-  rt <- newRuntime
-  x  <- blockOn rt $ do
-    let xs := delayIO $ putStrLn "___1___"
-        ys := delayIO $ putStrLn "___0___"
-    () <- ys
-    () <- xs
-    let x := pure 42
-    let x := the (Future Bits32) $ (+ 1) <$> x
-    x <- x
-    let ys := spawn rt $ delayIO $ putStrLn "___spawn___"
-    ys <- ys
-    -- let () = case the (Either JoinError ()) ys of
-    --            Right ok => ok
-    --            Left err => unsafePerformIO $ printLn err
-    delayIO $ printLn x
-  printLn x
+  rt <- primIO $ prim__new_runtime
+  rt <- primIO $ prim__runtime__get_handle rt
+  _  <- primIO $ prim__spawn rt . prim__delay $ \_ => toPrim $ do
+          putStrLn "___1___"
+          pure prim__null_ptr
+  pure ()

@@ -1,5 +1,5 @@
 /target
 /Cargo.lock
 x/async_rt.h
-x/async/build
+build/
 x/async/src/Async/Generated.idr

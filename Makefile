@@ -27,3 +27,10 @@ ilib:
 
 run:
 	(./x/async/build/exec/main)
+
+clib: rlib
+	(mkdir -p x/c_src/build)
+	(clang -g -Wall -pedantic -o x/c_src/build/main target/debug/libasyncrt.so x/c_src/main.c)
+
+run-c:
+	(./x/c_src/build/main)
