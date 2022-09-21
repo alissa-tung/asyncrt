@@ -25,8 +25,12 @@ export
 prim__null_ptr : AnyOutputPtr
 
 export
-%foreign rtLib "prim__new_runtime"
-prim__new_runtime : PrimIO RtPtr
+%foreign rtLib "prim__runtime__new"
+prim__runtime__new : PrimIO RtPtr
+
+export
+%foreign rtLib "prim__runtime__drop"
+prim__runtime__drop : RtPtr -> PrimIO ()
 
 export
 %foreign rtLib "prim__runtime__get_handle"

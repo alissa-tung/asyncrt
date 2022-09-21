@@ -7,9 +7,11 @@ import Async.FFIs
 export
 main : IO ()
 main = do
-  rt <- primIO $ prim__new_runtime
-  rt <- primIO $ prim__runtime__get_handle rt
-  _  <- primIO $ prim__spawn rt . prim__delay $ \_ => toPrim $ do
+  rt  <- primIO $ prim__runtime__new
+  rtH <- primIO $ prim__runtime__get_handle rt
+  xs  <- primIO $ prim__spawn rtH . prim__delay $ \_ => toPrim $ do
           putStrLn "___1___"
           pure prim__null_ptr
+  _    <- primIO $ prim__block_on rtH xs
+  primIO $ prim__runtime__drop rt
   pure ()

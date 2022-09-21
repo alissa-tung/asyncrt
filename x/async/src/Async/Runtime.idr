@@ -12,6 +12,6 @@ record Runtime where
 export
 newRuntime : HasIO io => io Runtime
 newRuntime = do
-  rtPtr  <- primIO prim__new_runtime
+  rtPtr  <- primIO prim__runtime__new
   rtHPtr <- primIO $ prim__runtime__get_handle rtPtr
   pure $ MkRuntime rtHPtr

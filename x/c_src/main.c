@@ -8,7 +8,7 @@ AnyPtr println() {
 }
 
 int main() {
-  const void *rt = prim__new_runtime();
+  const void *rt = prim__runtime__new();
   rt = prim__runtime__get_handle(rt);
 
   void *xs = prim__spawn(rt, prim__delay(println));

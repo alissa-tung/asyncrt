@@ -43,7 +43,7 @@ impl Future for AnyFuture {
 }
 
 #[no_mangle]
-pub extern "C" fn prim__new_runtime() -> *const libc::c_void {
+pub extern "C" fn prim__runtime__new() -> *const libc::c_void {
     let rt = Box::new(
         runtime::Builder::new_multi_thread()
             .enable_all()
@@ -51,6 +51,12 @@ pub extern "C" fn prim__new_runtime() -> *const libc::c_void {
             .unwrap(),
     );
     Box::into_raw(rt) as _
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn prim__runtime__drop(rt: *mut libc::c_void) {
+    let rt: Box<Runtime> = Box::from_raw(rt as _);
+    drop(rt)
 }
 
 #[no_mangle]
@@ -147,9 +153,19 @@ pub unsafe extern "C" fn prim__join_result__get_error(x: usize) -> *const libc::
     x.as_ref().unwrap().error
 }
 
+extern "C" {
+    fn Sactivate_thread() -> libc::c_int;
+    fn Sdeactivate_thread();
+}
+
 #[no_mangle]
-pub extern "C" fn prim__delay(f: extern "C" fn() -> AnyPtr) -> *mut AnyFuture {
-    to_any_future(async move { f() })
+pub unsafe extern "C" fn prim__delay(f: extern "C" fn() -> AnyPtr) -> *mut AnyFuture {
+    to_any_future(async move {
+        Sactivate_thread();
+        let x = f();
+        Sdeactivate_thread();
+        x
+    })
 }
 
 #[no_mangle]
@@ -190,8 +206,8 @@ mod tests {
 
     use crate::{
         prim__any_future__bind, prim__any_future__map, prim__any_future__pure,
-        prim__any_ptr__from_u32, prim__block_on, prim__new_runtime, prim__null_ptr,
-        prim__runtime__get_handle, prim__spawn, to_any_future, AnyFuture, AnyPtr, JoinResult,
+        prim__any_ptr__from_u32, prim__block_on, prim__null_ptr, prim__runtime__get_handle,
+        prim__runtime__new, prim__spawn, to_any_future, AnyFuture, AnyPtr, JoinResult,
     };
 
     extern "C" fn incr_usize(x: AnyPtr) -> AnyPtr {
@@ -226,7 +242,7 @@ mod tests {
     #[test]
     fn test_main() {
         unsafe {
-            let rt = prim__new_runtime();
+            let rt = prim__runtime__new();
             let rt_handle = prim__runtime__get_handle(rt);
             drop(rt);
             let x = 42;
@@ -256,7 +272,7 @@ mod tests {
     #[test]
     fn test_spawn() {
         unsafe {
-            let rt = prim__new_runtime();
+            let rt = prim__runtime__new();
             let rt_handle = prim__runtime__get_handle(rt);
             drop(rt);
             let xs = prim__spawn(
@@ -297,7 +313,7 @@ mod tests {
     #[test]
     fn test_tokio_ffi() {
         unsafe {
-            let rt = prim__new_runtime();
+            let rt = prim__runtime__new();
             let rt = prim__runtime__get_handle(rt);
             _ = prim__block_on(
                 rt,
