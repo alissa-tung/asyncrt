@@ -10,8 +10,9 @@ record Runtime where
   rtHPtr : RtHPtr
 
 export
-newRuntime : HasIO io => io Runtime
-newRuntime = do
-  rtPtr  <- primIO prim__runtime__new
-  rtHPtr <- primIO $ prim__runtime__get_handle rtPtr
-  pure $ MkRuntime rtHPtr
+withRuntime : HasIO io => (Runtime -> io a) -> io a
+withRuntime f = do
+  rt <- primIO prim__runtime__new
+  x  <- f $ MkRuntime !(primIO $ prim__runtime__get_handle rt)
+  primIO . prim__runtime__drop $ rt
+  pure x
